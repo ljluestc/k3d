@@ -76,7 +76,6 @@ var ClusterExternalNodeRoles = []Role{
 
 // List of k3d technical label name
 const (
-	LabelClusterName             string = "k3d.cluster"
 	LabelClusterURL              string = "k3d.cluster.url"
 	LabelClusterToken            string = "k3d.cluster.token"
 	LabelClusterExternal         string = "k3d.cluster.external"
@@ -123,9 +122,9 @@ type ClusterCreateOpts struct {
 	GlobalEnv           []string          `json:"globalEnv,omitempty"`
 	HostAliases         []HostAlias       `json:"hostAliases,omitempty"`
 	Registries          struct {
-		Create *Registry         `json:"create,omitempty"`
-		Use    []*Registry       `json:"use,omitempty"`
-		Config *wharfie.Registry `json:"config,omitempty"` // registries.yaml (k3s config for containerd registry override)
+		Create *Registry   `json:"create,omitempty"`
+		Use    []*Registry `json:"use,omitempty"`
+		Config *Registry   `json:"config,omitempty"` // registries.yaml (k3s config for containerd registry override)
 	} `json:"registries,omitempty"`
 }
 
@@ -233,50 +232,7 @@ type ClusterNetwork struct {
 	Members  []*NetworkMember
 }
 
-// Cluster describes a k3d cluster
-type Cluster struct {
-	Name               string             `json:"name,omitempty"`
-	Network            ClusterNetwork     `json:"network,omitempty"`
-	Token              string             `json:"clusterToken,omitempty"`
-	Nodes              []*Node            `json:"nodes,omitempty"`
-	InitNode           *Node              // init server node
-	ExternalDatastore  *ExternalDatastore `json:"externalDatastore,omitempty"`
-	KubeAPI            *ExposureOpts      `json:"kubeAPI,omitempty"`
-	ServerLoadBalancer *Loadbalancer      `json:"serverLoadBalancer,omitempty"`
-	ImageVolume        string             `json:"imageVolume,omitempty"`
-	Volumes            []string           `json:"volumes,omitempty"` // k3d-managed volumes attached to this cluster
-}
-
-// ServerCountRunning returns the number of server nodes running in the cluster and the total number
-func (c *Cluster) ServerCountRunning() (int, int) {
-	serverCount := 0
-	serversRunning := 0
-	for _, node := range c.Nodes {
-		if node.Role == ServerRole {
-			serverCount++
-			if node.State.Running {
-				serversRunning++
-			}
-		}
-	}
-	return serverCount, serversRunning
-}
-
-// AgentCountRunning returns the number of agent nodes running in the cluster and the total number
-func (c *Cluster) AgentCountRunning() (int, int) {
-	agentCount := 0
-	agentsRunning := 0
-	for _, node := range c.Nodes {
-		if node.Role == AgentRole {
-			agentCount++
-			if node.State.Running {
-				agentsRunning++
-			}
-		}
-	}
-	return agentCount, agentsRunning
-}
-
+// NodeIP represents the IP configuration of a node
 type NodeIP struct {
 	IP     netip.Addr
 	Static bool
@@ -284,30 +240,30 @@ type NodeIP struct {
 
 // Node describes a k3d node
 type Node struct {
-	Name           string                `json:"name,omitempty"`
-	Role           Role                  `json:"role,omitempty"`
-	Image          string                `json:"image,omitempty"`
-	Volumes        []string              `json:"volumes,omitempty"`
-	Env            []string              `json:"env,omitempty"`
-	Cmd            []string              // filled automatically based on role
-	Args           []string              `json:"extraArgs,omitempty"`
-	Files          []File                `json:"files,omitempty"`
-	Ports          nat.PortMap           `json:"portMappings,omitempty"`
-	Restart        bool                  `json:"restart,omitempty"`
-	Created        string                `json:"created,omitempty"`
-	HostPidMode    bool                  `json:"hostPidMode,omitempty"`
-	RuntimeLabels  map[string]string     `json:"runtimeLabels,omitempty"`
-	RuntimeUlimits []*dockerunits.Ulimit `json:"runtimeUlimits,omitempty"`
-	K3sNodeLabels  map[string]string     `json:"k3sNodeLabels,omitempty"`
-	Networks       []string              // filled automatically
-	ExtraHosts     []string              // filled automatically (docker specific?)
-	ServerOpts     ServerOpts            `json:"serverOpts,omitempty"`
-	AgentOpts      AgentOpts             `json:"agentOpts,omitempty"`
-	GPURequest     string                // filled automatically
-	Memory         string                // filled automatically
-	State          NodeState             // filled automatically
-	IP             NodeIP                // filled automatically -> refers solely to the cluster network
-	HookActions    []NodeHook            `json:"hooks,omitempty"`
+	Name           string                         `json:"name,omitempty"`
+	Role           Role                           `json:"role,omitempty"`
+	Image          string                         `json:"image,omitempty"`
+	Volumes        []string                       `json:"volumes,omitempty"`
+	Env            []string                       `json:"env,omitempty"`
+	Cmd            []string                       // filled automatically based on role
+	Args           []string                       `json:"extraArgs,omitempty"`
+	Files          []File                         `json:"files,omitempty"`
+	Ports          map[nat.Port][]nat.PortBinding `json:"portMappings,omitempty"`
+	Restart        bool                           `json:"restart,omitempty"`
+	Created        string                         `json:"created,omitempty"`
+	HostPidMode    bool                           `json:"hostPidMode,omitempty"`
+	RuntimeLabels  map[string]string              `json:"runtimeLabels,omitempty"`
+	RuntimeUlimits []*dockerunits.Ulimit          `json:"runtimeUlimits,omitempty"`
+	K3sNodeLabels  map[string]string              `json:"k3sNodeLabels,omitempty"`
+	Networks       []string                       // filled automatically
+	ExtraHosts     []string                       // filled automatically (docker specific?)
+	ServerOpts     ServerOpts                     `json:"serverOpts,omitempty"`
+	AgentOpts      AgentOpts                      `json:"agentOpts,omitempty"`
+	GPURequest     string                         // filled automatically
+	Memory         string                         // filled automatically
+	State          NodeState                      // filled automatically
+	IP             NodeIP                         // filled automatically -> refers solely to the cluster network
+	HookActions    []NodeHook                     `json:"hooks,omitempty"`
 	K3dEntrypoint  bool
 }
 
@@ -319,8 +275,8 @@ type ServerOpts struct {
 
 // ExposureOpts describes settings that the user can set for accessing the Kubernetes API
 type ExposureOpts struct {
-	nat.PortMapping        // filled automatically (reference to normal portmapping)
-	Host            string `json:"host,omitempty"`
+	Ports map[string][]string `json:"portMappings,omitempty"` // port mappings (host:container)
+	Host  string              `json:"host,omitempty"`
 }
 
 // ExternalDatastore describes an external datastore used for HA/multi-server clusters
