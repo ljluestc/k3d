@@ -555,11 +555,12 @@ ClusterCreatOpts:
 			l.Log().Infof("No loadbalancer specified, creating a default one...")
 			cluster.ServerLoadBalancer = k3d.NewLoadbalancer()
 			var err error
-			cluster.ServerLoadBalancer.Node, err = LoadbalancerPrepare(ctx, runtime, cluster, &k3d.LoadbalancerCreateOpts{Labels: clusterCreateOpts.GlobalLabels})
+			lbNode, err := LoadbalancerPrepare(ctx, runtime, cluster, &k3d.LoadbalancerCreateOpts{Labels: clusterCreateOpts.GlobalLabels})
 			if err != nil {
 				return fmt.Errorf("failed to prepare loadbalancer: %w", err)
 			}
-			cluster.Nodes = append(cluster.Nodes, cluster.ServerLoadBalancer.Node) // append lbNode to list of cluster nodes, so it will be considered during rollback
+			cluster.ServerLoadBalancer.Node = *lbNode
+			cluster.Nodes = append(cluster.Nodes, &cluster.ServerLoadBalancer.Node) // append lbNode to list of cluster nodes, so it will be considered during rollback
 		}
 
 		if len(cluster.ServerLoadBalancer.Config.Ports) == 0 {
@@ -597,7 +598,7 @@ ClusterCreatOpts:
 		cluster.ServerLoadBalancer.Node.Restart = true
 
 		l.Log().Infof("Creating LoadBalancer '%s'", cluster.ServerLoadBalancer.Node.Name)
-		if err := NodeCreate(ctx, runtime, cluster.ServerLoadBalancer.Node, k3d.NodeCreateOpts{}); err != nil {
+		if err := NodeCreate(ctx, runtime, &cluster.ServerLoadBalancer.Node, k3d.NodeCreateOpts{}); err != nil {
 			return fmt.Errorf("error creating loadbalancer: %v", err)
 		}
 		l.Log().Debugf("Created loadbalancer '%s'", cluster.ServerLoadBalancer.Node.Name)
@@ -856,15 +857,16 @@ func ClusterGet(ctx context.Context, runtime k3drt.Runtime, cluster *k3d.Cluster
 
 	// Loadbalancer
 	if cluster.ServerLoadBalancer == nil {
-		for _, node := range cluster.Nodes {
+		for i, node := range cluster.Nodes {
 			if node.Role == k3d.LoadBalancerRole {
 				cluster.ServerLoadBalancer = &k3d.Loadbalancer{
-					Node: node,
+					Node: *node,
 				}
+				cluster.Nodes[i] = &cluster.ServerLoadBalancer.Node
 			}
 		}
 
-		if cluster.ServerLoadBalancer != nil && cluster.ServerLoadBalancer.Node != nil {
+		if cluster.ServerLoadBalancer != nil {
 			lbcfg, err := GetLoadbalancerConfig(ctx, runtime, cluster)
 			if err != nil {
 				l.Log().Errorf("error getting loadbalancer config from %s: %v", cluster.ServerLoadBalancer.Node.Name, err)
@@ -1202,12 +1204,12 @@ func ClusterEditChangesetSimple(ctx context.Context, runtime k3drt.Runtime, clus
 	lbChangeset := &k3d.Loadbalancer{}
 
 	// copy existing loadbalancer
-	lbChangesetNode, err := CopyNode(ctx, existingLB.Node, CopyNodeOpts{keepState: false})
+	lbChangesetNode, err := CopyNode(ctx, &existingLB.Node, CopyNodeOpts{keepState: false})
 	if err != nil {
 		return fmt.Errorf("error copying existing loadbalancer: %w", err)
 	}
 
-	lbChangeset.Node = lbChangesetNode
+	lbChangeset.Node = *lbChangesetNode
 
 	// copy config from existing loadbalancer
 	lbChangesetConfig, err := copystruct.Copy(existingLB.Config)
@@ -1265,7 +1267,7 @@ func ClusterEditChangesetSimple(ctx context.Context, runtime k3drt.Runtime, clus
 	}
 	lbChangeset.Node.HookActions = append(lbChangeset.Node.HookActions, writeLbConfigAction)
 
-	if err := NodeReplace(ctx, runtime, existingLB.Node, lbChangeset.Node); err != nil {
+	if err := NodeReplace(ctx, runtime, &existingLB.Node, &lbChangeset.Node); err != nil {
 		return fmt.Errorf("error replacing loadbalancer node: %w", err)
 	}
 

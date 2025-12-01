@@ -80,18 +80,18 @@ func UpdateLoadbalancerConfig(ctx context.Context, runtime runtimes.Runtime, clu
 	}
 	l.Log().Debugf("Writing lb config:\n%s", string(newLbConfigYaml))
 	startTime := time.Now().Truncate(time.Second).UTC()
-	if err := runtime.WriteToNode(ctx, newLbConfigYaml, k3d.DefaultLoadbalancerConfigPath, 0744, cluster.ServerLoadBalancer.Node); err != nil {
+	if err := runtime.WriteToNode(ctx, newLbConfigYaml, k3d.DefaultLoadbalancerConfigPath, 0744, &cluster.ServerLoadBalancer.Node); err != nil {
 		return fmt.Errorf("error writing new loadbalancer config to container: %w", err)
 	}
 
 	successCtx, successCtxCancel := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
 	defer successCtxCancel()
-	err = NodeWaitForLogMessage(successCtx, runtime, cluster.ServerLoadBalancer.Node, k3d.GetReadyLogMessage(cluster.ServerLoadBalancer.Node, k3d.IntentAny), startTime)
+	err = NodeWaitForLogMessage(successCtx, runtime, &cluster.ServerLoadBalancer.Node, k3d.GetReadyLogMessage(&cluster.ServerLoadBalancer.Node, k3d.IntentAny), startTime)
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			failureCtx, failureCtxCancel := context.WithDeadline(ctx, time.Now().Add(5*time.Second))
 			defer failureCtxCancel()
-			err = NodeWaitForLogMessage(failureCtx, runtime, cluster.ServerLoadBalancer.Node, "host not found in upstream", startTime)
+			err = NodeWaitForLogMessage(failureCtx, runtime, &cluster.ServerLoadBalancer.Node, "host not found in upstream", startTime)
 			if err != nil {
 				l.Log().Warnf("Failed to check if the loadbalancer was configured correctly or if it broke. Please check it manually or try again: %v", err)
 				return ErrLBConfigFailedTest
@@ -114,20 +114,21 @@ func UpdateLoadbalancerConfig(ctx context.Context, runtime runtimes.Runtime, clu
 func GetLoadbalancerConfig(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.Cluster) (k3d.LoadbalancerConfig, error) {
 	var cfg k3d.LoadbalancerConfig
 
-	if cluster.ServerLoadBalancer == nil || cluster.ServerLoadBalancer.Node == nil {
+	if cluster.ServerLoadBalancer == nil {
 		cluster.ServerLoadBalancer = &k3d.Loadbalancer{}
 		for _, node := range cluster.Nodes {
 			if node.Role == k3d.LoadBalancerRole {
 				var err error
-				cluster.ServerLoadBalancer.Node, err = NodeGet(ctx, runtime, node)
+				lbNode, err := NodeGet(ctx, runtime, node)
 				if err != nil {
 					return cfg, fmt.Errorf("failed to get loadbalancer node '%s': %w", node.Name, err)
 				}
+				cluster.ServerLoadBalancer.Node = *lbNode
 			}
 		}
 	}
 
-	reader, err := runtime.ReadFromNode(ctx, k3d.DefaultLoadbalancerConfigPath, cluster.ServerLoadBalancer.Node)
+	reader, err := runtime.ReadFromNode(ctx, k3d.DefaultLoadbalancerConfigPath, &cluster.ServerLoadBalancer.Node)
 	if err != nil {
 		return cfg, fmt.Errorf("runtime failed to read loadbalancer config '%s' from node '%s': %w", k3d.DefaultLoadbalancerConfigPath, cluster.ServerLoadBalancer.Node.Name, err)
 	}

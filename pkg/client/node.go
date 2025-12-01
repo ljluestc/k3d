@@ -999,7 +999,7 @@ func NodeEdit(ctx context.Context, runtime runtimes.Runtime, existingNode *k3d.N
 		if cluster.ServerLoadBalancer == nil {
 			cluster.ServerLoadBalancer = k3d.NewLoadbalancer()
 		}
-		cluster.ServerLoadBalancer.Node = result
+		cluster.ServerLoadBalancer.Node = *result
 		lbConfig, err := LoadbalancerGenerateConfig(cluster)
 		if err != nil {
 			return fmt.Errorf("error generating loadbalancer config: %v", err)

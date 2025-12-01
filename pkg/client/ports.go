@@ -83,7 +83,7 @@ func TransformPorts(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.
 				if cluster.ServerLoadBalancer == nil {
 					return fmt.Errorf("port-mapping of type 'proxy' specified, but loadbalancer is disabled")
 				}
-				changePortMappings(cluster.ServerLoadBalancer.Node, portmappings, removalFlag)
+				changePortMappings(&cluster.ServerLoadBalancer.Node, portmappings, removalFlag)
 				for _, pm := range portmappings {
 					if err := changeLBPortConfigs(cluster.ServerLoadBalancer, pm, nodes, removalFlag); err != nil {
 						return fmt.Errorf("error modifying loadbalancer port config : %w", err)
