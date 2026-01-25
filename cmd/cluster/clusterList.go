@@ -102,7 +102,7 @@ func buildClusterList(ctx context.Context, args []string) []*k3d.Cluster {
 func PrintClusters(clusters []*k3d.Cluster, flags clusterFlags) {
 	// the output details printed when we dump JSON/YAML
 	type jsonOutput struct {
-		k3d.Cluster
+		*k3d.Cluster
 		ServersRunning int  `json:"serversRunning"`
 		ServersCount   int  `json:"serversCount"`
 		AgentsRunning  int  `json:"agentsRunning"`
@@ -139,7 +139,7 @@ func PrintClusters(clusters []*k3d.Cluster, flags clusterFlags) {
 
 		if outputFormat == "json" || outputFormat == "yaml" {
 			entry := jsonOutput{
-				Cluster:        *cluster,
+				Cluster:        cluster,
 				ServersRunning: serversRunning,
 				ServersCount:   serverCount,
 				AgentsRunning:  agentsRunning,
