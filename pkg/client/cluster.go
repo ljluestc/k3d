@@ -71,8 +71,6 @@ func ClusterRun(ctx context.Context, runtime k3drt.Runtime, clusterConfig *confi
 	}
 
 	// Create tools-node for later steps
-	// Ref: https://github.com/k3d-io/k3d/pull/1098/files (Wait, this is the PR I am fixing? No, 1098 is the panic fix)
-	// We run this sequentially now to avoid race conditions with rootless podman
 	if _, err := EnsureToolsNode(ctx, runtime, &clusterConfig.Cluster); err != nil {
 		return fmt.Errorf("failed to ensure tools node: %w", err)
 	}

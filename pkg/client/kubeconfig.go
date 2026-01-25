@@ -51,7 +51,7 @@ type WriteKubeConfigOptions struct {
 // 3. writes it to the specified output
 func KubeconfigGetWrite(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.Cluster, output string, writeKubeConfigOptions *WriteKubeConfigOptions) (string, error) {
 	// get kubeconfig from cluster node
-	kubeconfig, err := KubeconfigGet(ctx, runtime, cluster)
+	kubeconfig, err := KubeconfigGet(ctx, runtime, cluster, writeKubeConfigOptions)
 	if err != nil {
 		return output, fmt.Errorf("failed to get kubeconfig for cluster '%s': %w", cluster.Name, err)
 	}
@@ -107,7 +107,7 @@ func KubeconfigGetWrite(ctx context.Context, runtime runtimes.Runtime, cluster *
 // KubeconfigGet grabs the kubeconfig file from /output from a server node container,
 // modifies it by updating some fields with cluster-specific information
 // and returns a Config object for further processing
-func KubeconfigGet(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.Cluster) (*clientcmdapi.Config, error) {
+func KubeconfigGet(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.Cluster, options *WriteKubeConfigOptions) (*clientcmdapi.Config, error) {
 	// get all server nodes for the selected cluster
 	// TODO: getKubeconfig: we should make sure, that the server node we're trying to fetch from is actually running
 	serverNodes, err := runtime.GetNodesByLabel(ctx, map[string]string{k3d.LabelClusterName: cluster.Name, k3d.LabelRole: string(k3d.ServerRole)})
@@ -118,25 +118,9 @@ func KubeconfigGet(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.C
 		return nil, fmt.Errorf("didn't find any server node for cluster '%s'", cluster.Name)
 	}
 
-	// prefer a server node, which actually has the port exposed
-	var chosenServer *k3d.Node
-	chosenServer = nil
-	APIPort := k3d.DefaultAPIPort
-	APIHost := k3d.DefaultAPIHost
-
-	for _, server := range serverNodes {
-		if _, ok := server.RuntimeLabels[k3d.LabelServerAPIPort]; ok {
-			chosenServer = server
-			APIPort = server.RuntimeLabels[k3d.LabelServerAPIPort]
-			if _, ok := server.RuntimeLabels[k3d.LabelServerAPIHost]; ok {
-				APIHost = server.RuntimeLabels[k3d.LabelServerAPIHost]
-			}
-			break
-		}
-	}
-
-	if chosenServer == nil {
-		chosenServer = serverNodes[0]
+	chosenServer, APIHost, APIPort, err := kubeconfigSelectAPIEndpoint(serverNodes, options)
+	if err != nil {
+		return nil, err
 	}
 	// get the kubeconfig from the first server node
 	reader, err := runtime.GetKubeconfig(ctx, chosenServer)
@@ -190,6 +174,42 @@ func KubeconfigGet(ctx context.Context, runtime runtimes.Runtime, cluster *k3d.C
 	l.Log().Tracef("Modified Kubeconfig: %+v", kc)
 
 	return kc, nil
+}
+
+func kubeconfigSelectAPIEndpoint(serverNodes []*k3d.Node, options *WriteKubeConfigOptions) (*k3d.Node, string, string, error) {
+	if len(serverNodes) == 0 {
+		return nil, "", "", fmt.Errorf("didn't find any server node")
+	}
+
+	chosenServer := serverNodes[0]
+	APIPort := k3d.DefaultAPIPort
+	APIHost := k3d.DefaultAPIHost
+
+	for _, server := range serverNodes {
+		if port, ok := server.RuntimeLabels[k3d.LabelServerAPIPort]; ok {
+			chosenServer = server
+			APIPort = port
+			if host, ok := server.RuntimeLabels[k3d.LabelServerAPIHost]; ok {
+				APIHost = host
+			}
+			break
+		}
+	}
+
+	if options != nil && options.UseInternalAPI {
+		APIPort = k3d.DefaultAPIPort
+		if lb, ok := chosenServer.RuntimeLabels[k3d.LabelServerLoadBalancer]; ok && lb != "" {
+			APIHost = lb
+		} else if chosenServer.Name != "" {
+			APIHost = chosenServer.Name
+		} else if chosenServer.IP.IP.IsValid() {
+			APIHost = chosenServer.IP.IP.String()
+		} else {
+			return nil, "", "", fmt.Errorf("failed to determine internal API address")
+		}
+	}
+
+	return chosenServer, APIHost, APIPort, nil
 }
 
 // KubeconfigWriteToPath takes a kubeconfig and writes it to some path, which can be '-' for os.Stdout
