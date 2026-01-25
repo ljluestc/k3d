@@ -34,7 +34,8 @@ import (
 )
 
 type getKubeconfigFlags struct {
-	all bool
+	all      bool
+	internal bool
 }
 
 // NewCmdKubeconfigGet returns a new cobra command
@@ -80,6 +81,9 @@ func NewCmdKubeconfigGet() *cobra.Command {
 				}
 			}
 
+			// set options
+			writeKubeConfigOptions.UseInternalAPI = getKubeconfigFlags.internal
+
 			// get kubeconfigs from all clusters
 			errorGettingKubeconfig := false
 			for _, c := range clusters {
@@ -100,6 +104,7 @@ func NewCmdKubeconfigGet() *cobra.Command {
 
 	// add flags
 	cmd.Flags().BoolVarP(&getKubeconfigFlags.all, "all", "a", false, "Output kubeconfigs from all existing clusters")
+	cmd.Flags().BoolVar(&getKubeconfigFlags.internal, "internal", false, "Use internal API URL (internal Docker IP & port) instead of the localhost/host-mapped address")
 
 	// done
 	return cmd

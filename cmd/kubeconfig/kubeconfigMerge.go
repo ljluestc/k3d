@@ -41,6 +41,7 @@ type mergeKubeconfigFlags struct {
 	all           bool
 	output        string
 	targetDefault bool
+	internal      bool
 }
 
 // NewCmdKubeconfigMerge returns a new cobra command
@@ -85,6 +86,9 @@ func NewCmdKubeconfigMerge() *cobra.Command {
 					clusters = append(clusters, retrievedCluster)
 				}
 			}
+
+			// set options
+			writeKubeConfigOptions.UseInternalAPI = mergeKubeconfigFlags.internal
 
 			// get kubeconfigs from all clusters
 			errorGettingKubeconfig := false
@@ -131,6 +135,7 @@ func NewCmdKubeconfigMerge() *cobra.Command {
 	cmd.Flags().BoolVarP(&writeKubeConfigOptions.UpdateCurrentContext, "kubeconfig-switch-context", "s", true, "Switch to new context")
 	cmd.Flags().BoolVar(&writeKubeConfigOptions.OverwriteExisting, "overwrite", false, "[Careful!] Overwrite existing file, ignoring its contents")
 	cmd.Flags().BoolVarP(&mergeKubeconfigFlags.all, "all", "a", false, "Get kubeconfigs from all existing clusters")
+	cmd.Flags().BoolVar(&mergeKubeconfigFlags.internal, "internal", false, "Use internal API URL (internal Docker IP & port) instead of the localhost/host-mapped address")
 
 	// done
 	return cmd
