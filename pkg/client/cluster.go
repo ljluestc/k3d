@@ -63,14 +63,6 @@ func ClusterRun(ctx context.Context, runtime k3drt.Runtime, clusterConfig *confi
 		return fmt.Errorf("Failed Cluster Preparation: %+v", err)
 	}
 
-	// Create tools-node for later steps
-
-	g, _ := errgroup.WithContext(ctx)
-	g.Go(func() error {
-		_, err := EnsureToolsNode(ctx, runtime, &clusterConfig.Cluster)
-		return err
-	})
-
 	/*
 	 * Step 1: Create Containers
 	 */
@@ -78,8 +70,8 @@ func ClusterRun(ctx context.Context, runtime k3drt.Runtime, clusterConfig *confi
 		return fmt.Errorf("failed Cluster Creation: %+v", err)
 	}
 
-	// Wait for tools node to be available
-	if err := g.Wait(); err != nil {
+	// Create tools-node for later steps
+	if _, err := EnsureToolsNode(ctx, runtime, &clusterConfig.Cluster); err != nil {
 		return fmt.Errorf("failed to ensure tools node: %w", err)
 	}
 
