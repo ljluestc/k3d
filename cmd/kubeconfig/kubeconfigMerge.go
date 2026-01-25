@@ -130,6 +130,7 @@ func NewCmdKubeconfigMerge() *cobra.Command {
 	cmd.Flags().BoolVarP(&writeKubeConfigOptions.UpdateExisting, "update", "u", true, "Update conflicting fields in existing kubeconfig")
 	cmd.Flags().BoolVarP(&writeKubeConfigOptions.UpdateCurrentContext, "kubeconfig-switch-context", "s", true, "Switch to new context")
 	cmd.Flags().BoolVar(&writeKubeConfigOptions.OverwriteExisting, "overwrite", false, "[Careful!] Overwrite existing file, ignoring its contents")
+	cmd.Flags().BoolVar(&writeKubeConfigOptions.UseInternalAPI, "internal", false, "Use internal IP/Address of the node container (instead of the host address/port mapping)")
 	cmd.Flags().BoolVarP(&mergeKubeconfigFlags.all, "all", "a", false, "Get kubeconfigs from all existing clusters")
 
 	// done

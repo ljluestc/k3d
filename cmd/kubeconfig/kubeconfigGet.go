@@ -100,6 +100,7 @@ func NewCmdKubeconfigGet() *cobra.Command {
 
 	// add flags
 	cmd.Flags().BoolVarP(&getKubeconfigFlags.all, "all", "a", false, "Output kubeconfigs from all existing clusters")
+	cmd.Flags().BoolVar(&writeKubeConfigOptions.UseInternalAPI, "internal", false, "Use internal IP/Address of the node container (instead of the host address/port mapping)")
 
 	// done
 	return cmd
