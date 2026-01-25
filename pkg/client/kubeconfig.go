@@ -42,6 +42,7 @@ type WriteKubeConfigOptions struct {
 	UpdateExisting       bool
 	UpdateCurrentContext bool
 	OverwriteExisting    bool
+	UseInternalAPI       bool
 }
 
 // KubeconfigGetWrite ...
